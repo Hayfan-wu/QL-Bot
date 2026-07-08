@@ -46,21 +46,35 @@ class QingLongAPI:
 
     def create_env(self, name, value, remarks=''):
         url = f'{self.base_url}/open/envs'
-        payload = {'name': name, 'value': value, 'remarks': remarks}
-        r = requests.post(url, headers=self._headers(), json=payload, timeout=10)
-        data = r.json()
-        if data.get('code') == 200:
-            return data.get('data')
-        raise Exception(f'创建环境变量失败: {data}')
+        # 新版青龙（v2.15+）要求 body 为数组，旧版为对象，优先尝试数组
+        payloads = [
+            [{'name': name, 'value': value, 'remarks': remarks}],
+            {'name': name, 'value': value, 'remarks': remarks},
+        ]
+        last_error = None
+        for payload in payloads:
+            r = requests.post(url, headers=self._headers(), json=payload, timeout=10)
+            data = r.json()
+            if data.get('code') == 200:
+                return data.get('data')
+            last_error = data
+        raise Exception(f'创建环境变量失败: {last_error}')
 
     def update_env(self, env_id, name, value, remarks=''):
         url = f'{self.base_url}/open/envs'
-        payload = {'id': env_id, 'name': name, 'value': value, 'remarks': remarks}
-        r = requests.put(url, headers=self._headers(), json=payload, timeout=10)
-        data = r.json()
-        if data.get('code') == 200:
-            return data.get('data')
-        raise Exception(f'更新环境变量失败: {data}')
+        # 新版青龙（v2.15+）要求 body 为数组，旧版为对象，优先尝试数组
+        payloads = [
+            [{'id': env_id, 'name': name, 'value': value, 'remarks': remarks}],
+            {'id': env_id, 'name': name, 'value': value, 'remarks': remarks},
+        ]
+        last_error = None
+        for payload in payloads:
+            r = requests.put(url, headers=self._headers(), json=payload, timeout=10)
+            data = r.json()
+            if data.get('code') == 200:
+                return data.get('data')
+            last_error = data
+        raise Exception(f'更新环境变量失败: {last_error}')
 
     def delete_env(self, env_id):
         url = f'{self.base_url}/open/envs'
