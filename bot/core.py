@@ -102,8 +102,16 @@ class BotCore:
             return True
         return str(sender_id) in Config.ADMIN_QQ.split(',')
 
-    async def handle_ws(self, websocket, path):
-        Log.ok(f'NapCat 已连接: {websocket.remote_address}')
+    async def handle_ws(self, websocket):
+        # websockets 14+ 不再传入 path 参数，通过 request.path 获取
+        try:
+            req_path = websocket.request.path
+        except Exception:
+            req_path = '/'
+        if Config.WS_PATH and req_path != Config.WS_PATH:
+            Log.warn(f'NapCat 连接路径不匹配: {req_path}，期望: {Config.WS_PATH}')
+            return
+        Log.ok(f'NapCat 已连接: {websocket.remote_address}, path={req_path}')
         try:
             async for message in websocket:
                 Log.info(f'收到原始消息: {message}')
@@ -151,5 +159,5 @@ class BotCore:
     async def run(self):
         self.load_plugins()
         Log.ok(f'启动 QQ 机器人，监听 ws://{Config.WS_HOST}:{Config.WS_PORT}{Config.WS_PATH}')
-        async with websockets.serve(self.handle_ws, Config.WS_HOST, Config.WS_PORT, path=Config.WS_PATH):
+        async with websockets.serve(self.handle_ws, Config.WS_HOST, Config.WS_PORT):
             await asyncio.Future()
