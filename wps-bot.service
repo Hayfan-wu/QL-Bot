@@ -1,0 +1,14 @@
+[Unit]
+Description=QQ Bot Service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/qq-bot
+EnvironmentFile=/opt/qq-bot/.env
+ExecStart=/usr/bin/python3 /opt/qq-bot/main.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
