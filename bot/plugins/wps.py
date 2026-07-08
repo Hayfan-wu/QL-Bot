@@ -22,7 +22,7 @@ import sys
 from datetime import datetime
 
 from bot.plugins.base import Plugin
-from bot.ql_api import ql
+from bot.ql_api import QingLongAPI, ql
 from bot.session import sessions
 from bot.utils import Log
 from bot.wps_api import WpsAPI
@@ -37,9 +37,71 @@ def _now_ts():
     return datetime.now().timestamp()
 
 
+def _parse_env_file(env_path):
+    """读取简单 KEY=VALUE 格式的 .env 文件"""
+    values = {}
+    if not env_path or not os.path.exists(env_path):
+        return values
+
+    with open(env_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+            key, value = line.split('=', 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            values[key] = value
+    return values
+
+
+def _get_wps_script_path():
+    """获取 WPS 自动脚本路径，优先使用新变量名"""
+    project_dir = os.getenv('WPS_PROJECT_DIR', '').strip()
+    if os.getenv('WPS_SCRIPT_PATH'):
+        return os.getenv('WPS_SCRIPT_PATH')
+    if os.getenv('WPS_AUTO_PATH'):
+        return os.getenv('WPS_AUTO_PATH')
+    if project_dir:
+        return os.path.join(project_dir, 'wps_auto.py')
+    return 'wps_auto.py'
+
+
+def _get_wps_project_dir():
+    """获取 QL-WPS 项目目录"""
+    project_dir = os.getenv('WPS_PROJECT_DIR', '').strip()
+    if project_dir:
+        return project_dir
+
+    script_path = _get_wps_script_path()
+    script_dir = os.path.dirname(os.path.expanduser(script_path))
+    return script_dir or ''
+
+
+def _get_wps_ql():
+    """从 QL-WPS 项目 .env 创建青龙客户端；缺省时兼容旧全局配置"""
+    project_dir = _get_wps_project_dir()
+    env_path = os.path.join(project_dir, '.env') if project_dir else ''
+    env_values = _parse_env_file(env_path)
+
+    ql_url = env_values.get('QL_URL')
+    client_id = env_values.get('QL_CLIENT_ID')
+    client_secret = env_values.get('QL_CLIENT_SECRET')
+
+    if ql_url and client_id and client_secret:
+        return QingLongAPI(
+            base_url=ql_url,
+            client_id=client_id,
+            client_secret=client_secret,
+        )
+
+    return ql
+
+
 def _get_wps_cookie():
     """从青龙获取 WPS_COOKIE"""
-    envs = ql.list_envs(WPS_COOKIE_NAME)
+    wps_ql = _get_wps_ql()
+    envs = wps_ql.list_envs(WPS_COOKIE_NAME)
     for env in envs:
         if env.get('name') == WPS_COOKIE_NAME:
             return env
@@ -50,23 +112,24 @@ def _save_wps_cookie(cookie, nickname='', uid=0):
     """保存或更新 WPS_COOKIE"""
     remark = f'{nickname}({uid})' if nickname and uid else 'WPS Cookie'
     existing = _get_wps_cookie()
+    wps_ql = _get_wps_ql()
     if existing:
-        return ql.update_env(existing['id'], WPS_COOKIE_NAME, cookie, remarks=remark)
-    return ql.create_env(WPS_COOKIE_NAME, cookie, remarks=remark)
+        return wps_ql.update_env(existing['id'], WPS_COOKIE_NAME, cookie, remarks=remark)
+    return wps_ql.create_env(WPS_COOKIE_NAME, cookie, remarks=remark)
 
 
 def _delete_wps_cookie():
     """删除 WPS_COOKIE"""
     existing = _get_wps_cookie()
     if existing:
-        ql.delete_env(existing['id'])
+        _get_wps_ql().delete_env(existing['id'])
         return True
     return False
 
 
 def _run_wps_auto():
     """执行 wps_auto.py，返回输出"""
-    script_path = os.getenv('WPS_AUTO_PATH', 'wps_auto.py')
+    script_path = _get_wps_script_path()
     script_path = os.path.expanduser(script_path)
     base_dir = os.path.dirname(script_path) if os.path.dirname(script_path) else os.getcwd()
     script_name = os.path.basename(script_path)

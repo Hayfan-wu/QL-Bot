@@ -15,9 +15,10 @@ QL-Bot/           <- 本仓库：QQ 机器人框架 + 控制插件
 │   │   ├── wps.py      <- WPS 控制插件
 │   │   └── example.py  <- 新插件模板
 │   └── ...
-└── .env
+└── .env          <- 只放机器人配置、业务项目路径
 
 QL-WPS/           <- 业务仓库：具体自动化脚本
+├── .env          <- WPS 自己的青龙配置
 └── wps_auto.py
 
 QL-JD/            <- 未来新业务仓库（示例）
@@ -50,14 +51,20 @@ QQ_BOT_QQ=你的机器人QQ号
 NAPCAT_API=http://127.0.0.1:3000
 ADMIN_QQ=你的QQ号
 
-# 青龙面板
-QL_URL=http://127.0.0.1:5700
-QL_CLIENT_ID=your_client_id
-QL_CLIENT_SECRET=your_client_secret
-
-# WPS 业务脚本路径（指向 QL-WPS 仓库）
-WPS_AUTO_PATH=/opt/QL-WPS/wps_auto.py
+# WPS 项目路径（指向 QL-WPS 仓库）
+WPS_PROJECT_DIR=/opt/QL-WPS
+WPS_SCRIPT_PATH=/opt/QL-WPS/wps_auto.py
 ```
+
+WPS 使用的青龙面板配置请放到 `/opt/QL-WPS/.env`：
+
+```bash
+QL_URL=http://127.0.0.1:5700
+QL_CLIENT_ID=你的WPS项目青龙ClientID
+QL_CLIENT_SECRET=你的WPS项目青龙ClientSecret
+```
+
+`WPS_COOKIE` 不需要手动写入 `.env`。发送 `@机器人 WPS登录` 后粘贴 Cookie，机器人会自动把 `WPS_COOKIE` 写入 `QL-WPS/.env` 指定的青龙面板。
 
 ### 3. 启动
 
@@ -72,7 +79,7 @@ python3 main.py
 | `@机器人 WPS登录` | 45 秒内粘贴 Cookie，自动验证并写入青龙 `WPS_COOKIE` |
 | `@机器人 WPS登录 <cookie>` | 一键登录 |
 | `@机器人 WPS查询` | 查询 WPS 账号状态、签到、任务、抽奖 |
-| `@机器人 WPS执行` | 立即执行 `WPS_AUTO_PATH` 指向的脚本 |
+| `@机器人 WPS执行` | 立即执行 `WPS_SCRIPT_PATH` 指向的脚本 |
 | `@机器人 WPS管理` | 查看当前 `WPS_COOKIE` |
 | `@机器人 WPS管理 登出` | 删除 `WPS_COOKIE` |
 | `@机器人 帮助` | 显示命令列表 |
@@ -158,7 +165,13 @@ git clone https://github.com/Hayfan-wu/QL-WPS.git
 git clone https://github.com/Hayfan-wu/QL-Bot.git
 
 # QL-Bot 的 .env 中配置
-WPS_AUTO_PATH=/opt/QL-WPS/wps_auto.py
+WPS_PROJECT_DIR=/opt/QL-WPS
+WPS_SCRIPT_PATH=/opt/QL-WPS/wps_auto.py
+
+# QL-WPS 的 .env 中配置
+QL_URL=http://127.0.0.1:5700
+QL_CLIENT_ID=你的WPS项目青龙ClientID
+QL_CLIENT_SECRET=你的WPS项目青龙ClientSecret
 
 # 启动 QQ 机器人
 cd /opt/QL-Bot

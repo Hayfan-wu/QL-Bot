@@ -10,10 +10,10 @@ from bot.utils import Log
 class QingLongAPI:
     """青龙环境变量管理"""
 
-    def __init__(self):
-        self.base_url = Config.QL_URL.rstrip('/')
-        self.client_id = Config.QL_CLIENT_ID
-        self.client_secret = Config.QL_CLIENT_SECRET
+    def __init__(self, base_url=None, client_id=None, client_secret=None):
+        self.base_url = (base_url or Config.QL_URL).rstrip('/')
+        self.client_id = client_id if client_id is not None else Config.QL_CLIENT_ID
+        self.client_secret = client_secret if client_secret is not None else Config.QL_CLIENT_SECRET
         self.token = None
 
     def _get_token(self):
