@@ -21,6 +21,8 @@ from bot.sf_api import SFLoginStatus, SFWechatLoginAPI
 SF_COOKIE_ENV = "sfsyUrl"
 SF_WECHAT_ENV = "SF_WECHAT_LOGIN"
 SF_LOGIN_TIMEOUT = 180
+DEFAULT_SF_PROJECT_DIR = "/opt/QL-SF"
+DEFAULT_SF_QR_OUTPUT_DIR = "/opt/QL-Bot"
 SF_SCRIPT_ENV_NAMES = [
     SF_COOKIE_ENV,
     "SFBF",
@@ -55,9 +57,12 @@ def _parse_env_file(env_path):
 
 def _get_sf_script_path():
     """获取顺丰脚本路径"""
-    project_dir = os.getenv("SF_PROJECT_DIR", "").strip()
+    project_dir = _get_sf_project_dir()
+    env_values = _get_sf_project_env()
     if os.getenv("SFSY_SCRIPT_PATH"):
         return os.getenv("SFSY_SCRIPT_PATH")
+    if env_values.get("SFSY_SCRIPT_PATH"):
+        return env_values.get("SFSY_SCRIPT_PATH")
     if project_dir:
         return os.path.join(project_dir, "sfsy.py")
     return "sfsy.py"
@@ -68,17 +73,29 @@ def _get_sf_project_dir():
     project_dir = os.getenv("SF_PROJECT_DIR", "").strip()
     if project_dir:
         return project_dir
+    return DEFAULT_SF_PROJECT_DIR
 
-    script_path = _get_sf_script_path()
-    script_dir = os.path.dirname(os.path.expanduser(script_path))
-    return script_dir or ""
+
+def _get_sf_project_env():
+    """读取 QL-SF 项目自己的 .env"""
+    project_dir = _get_sf_project_dir()
+    env_path = os.path.join(project_dir, ".env") if project_dir else ""
+    return _parse_env_file(env_path)
+
+
+def _get_sf_qr_output_dir():
+    """获取顺丰二维码输出目录"""
+    env_values = _get_sf_project_env()
+    if os.getenv("SF_QR_OUTPUT_DIR"):
+        return os.getenv("SF_QR_OUTPUT_DIR")
+    if env_values.get("SF_QR_OUTPUT_DIR"):
+        return env_values.get("SF_QR_OUTPUT_DIR")
+    return DEFAULT_SF_QR_OUTPUT_DIR
 
 
 def _get_sf_ql():
     """从 QL-SF 项目 .env 创建青龙客户端；缺省时兼容旧全局配置"""
-    project_dir = _get_sf_project_dir()
-    env_path = os.path.join(project_dir, ".env") if project_dir else ""
-    env_values = _parse_env_file(env_path)
+    env_values = _get_sf_project_env()
 
     ql_url = env_values.get("QL_URL")
     client_id = env_values.get("QL_CLIENT_ID")
@@ -238,7 +255,7 @@ class SfPlugin(Plugin):
         key = self._session_key(sender_id, group_id)
         self.api_by_key[key] = api
 
-        output_dir = Path(os.getenv("SF_QR_OUTPUT_DIR", ".")).resolve()
+        output_dir = Path(_get_sf_qr_output_dir()).resolve()
         output_dir.mkdir(parents=True, exist_ok=True)
         qr_path = output_dir / f"sf_login_{sender_id}.png"
         qr_path.write_bytes(qr_session.qr_png)

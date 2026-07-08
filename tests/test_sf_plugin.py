@@ -83,11 +83,57 @@ def test_sf_uses_qinglong_credentials_from_project_env(tmp_path, monkeypatch):
     assert api.client_secret == "sf_client_secret"
 
 
-def test_sf_script_path_prefers_explicit_path(monkeypatch):
-    monkeypatch.setenv("SF_PROJECT_DIR", "/opt/QL-SF")
-    monkeypatch.setenv("SFSY_SCRIPT_PATH", "/custom/sfsy.py")
+def test_sf_uses_default_project_env_without_bot_env(tmp_path, monkeypatch):
+    project_dir = tmp_path / "QL-SF"
+    project_dir.mkdir()
+    (project_dir / ".env").write_text(
+        "\n".join(
+            [
+                "QL_URL=http://sf-default-ql:5700/",
+                "QL_CLIENT_ID=default_sf_client_id",
+                "QL_CLIENT_SECRET=default_sf_client_secret",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.delenv("SF_PROJECT_DIR", raising=False)
+    monkeypatch.delenv("SFSY_SCRIPT_PATH", raising=False)
+    monkeypatch.setattr(sf, "DEFAULT_SF_PROJECT_DIR", str(project_dir), raising=False)
+
+    api = sf._get_sf_ql()
+
+    assert api.base_url == "http://sf-default-ql:5700"
+    assert api.client_id == "default_sf_client_id"
+    assert api.client_secret == "default_sf_client_secret"
+
+
+def test_sf_script_path_reads_project_env(tmp_path, monkeypatch):
+    project_dir = tmp_path / "QL-SF"
+    project_dir.mkdir()
+    (project_dir / ".env").write_text(
+        "SFSY_SCRIPT_PATH=/custom/sfsy.py\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.delenv("SFSY_SCRIPT_PATH", raising=False)
+    monkeypatch.setattr(sf, "DEFAULT_SF_PROJECT_DIR", str(project_dir), raising=False)
 
     assert sf._get_sf_script_path() == "/custom/sfsy.py"
+
+
+def test_sf_qr_output_dir_reads_project_env(tmp_path, monkeypatch):
+    project_dir = tmp_path / "QL-SF"
+    project_dir.mkdir()
+    (project_dir / ".env").write_text(
+        "SF_QR_OUTPUT_DIR=/custom/qr\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.delenv("SF_QR_OUTPUT_DIR", raising=False)
+    monkeypatch.setattr(sf, "DEFAULT_SF_PROJECT_DIR", str(project_dir), raising=False)
+
+    assert sf._get_sf_qr_output_dir() == "/custom/qr"
 
 
 def test_build_sfsy_env_injects_cookie_from_qinglong(monkeypatch):

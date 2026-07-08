@@ -59,10 +59,6 @@ ADMIN_QQ=你的QQ号
 WPS_PROJECT_DIR=/opt/QL-WPS
 WPS_SCRIPT_PATH=/opt/QL-WPS/wps_auto.py
 
-# 顺丰项目路径（指向 QL-SF 仓库）
-SF_PROJECT_DIR=/opt/QL-SF
-SFSY_SCRIPT_PATH=/opt/QL-SF/sfsy.py
-SF_QR_OUTPUT_DIR=/opt/QL-Bot
 ```
 
 WPS 使用的青龙面板配置请放到 `/opt/QL-WPS/.env`：
@@ -75,12 +71,14 @@ QL_CLIENT_SECRET=你的WPS项目青龙ClientSecret
 
 `WPS_COOKIE` 不需要手动写入 `.env`。发送 `@机器人 WPS登录` 后粘贴 Cookie，机器人会自动把 `WPS_COOKIE` 写入 `QL-WPS/.env` 指定的青龙面板。
 
-顺丰使用的青龙面板配置请放到 `/opt/QL-SF/.env`：
+顺丰配置请放到 `/opt/QL-SF/.env`：
 
 ```bash
 QL_URL=http://127.0.0.1:5700
 QL_CLIENT_ID=你的顺丰项目青龙ClientID
 QL_CLIENT_SECRET=你的顺丰项目青龙ClientSecret
+SFSY_SCRIPT_PATH=/opt/QL-SF/sfsy.py
+SF_QR_OUTPUT_DIR=/opt/QL-Bot
 ```
 
 `sfsyUrl` 不需要手动写入 `.env`。发送 `@机器人 顺丰Cookie sessionId=...;_login_user_id_=...;_login_mobile_=...` 后，机器人会自动把 `sfsyUrl` 写入 `QL-SF/.env` 指定的青龙面板；发送 `@机器人 顺丰执行` 时，会从青龙读取 `sfsyUrl` 并注入到 `/opt/QL-SF/sfsy.py` 的执行环境。
@@ -124,9 +122,8 @@ python3 main.py
 | --- | --- |
 | `SF_WECHAT_LOGIN` | 微信扫码后保存的顺丰会员态，包含 `OWFSESSION`、`memid`、`memNo`、`mobile` |
 | `sfsyUrl` | 顺丰积分任务 Cookie，格式为 `sessionId=xxx;_login_user_id_=xxx;_login_mobile_=xxx` |
-| `SF_PROJECT_DIR` | 顺丰业务仓库目录，例如 `/opt/QL-SF` |
-| `SFSY_SCRIPT_PATH` | 顺丰业务脚本路径，例如 `/opt/QL-SF/sfsy.py` |
-| `SF_QR_OUTPUT_DIR` | 顺丰二维码图片输出目录，默认当前工作目录 |
+| `SFSY_SCRIPT_PATH` | 顺丰业务脚本路径，配置在 `/opt/QL-SF/.env` |
+| `SF_QR_OUTPUT_DIR` | 顺丰二维码图片输出目录，配置在 `/opt/QL-SF/.env` |
 
 ### 当前限制
 
@@ -188,9 +185,6 @@ git clone https://github.com/Hayfan-wu/QL-Bot.git
 # QL-Bot 的 .env 中配置
 WPS_PROJECT_DIR=/opt/QL-WPS
 WPS_SCRIPT_PATH=/opt/QL-WPS/wps_auto.py
-SF_PROJECT_DIR=/opt/QL-SF
-SFSY_SCRIPT_PATH=/opt/QL-SF/sfsy.py
-SF_QR_OUTPUT_DIR=/opt/QL-Bot
 
 # QL-WPS 的 .env 中配置
 QL_URL=http://127.0.0.1:5700
@@ -201,6 +195,8 @@ QL_CLIENT_SECRET=你的WPS项目青龙ClientSecret
 QL_URL=http://127.0.0.1:5700
 QL_CLIENT_ID=你的顺丰项目青龙ClientID
 QL_CLIENT_SECRET=你的顺丰项目青龙ClientSecret
+SFSY_SCRIPT_PATH=/opt/QL-SF/sfsy.py
+SF_QR_OUTPUT_DIR=/opt/QL-Bot
 
 # 启动 QQ 机器人
 cd /opt/QL-Bot
