@@ -1,3 +1,4 @@
+from bot.plugins import sf
 from bot.plugins.sf import (
     SF_COOKIE_ENV,
     SF_WECHAT_ENV,
@@ -57,3 +58,44 @@ def test_format_image_cq_uses_file_uri_for_local_path():
 
     assert cq.startswith("[CQ:image,file=file:///")
     assert "sf_login_10001.png" in cq
+
+
+def test_sf_uses_qinglong_credentials_from_project_env(tmp_path, monkeypatch):
+    project_dir = tmp_path / "QL-SF"
+    project_dir.mkdir()
+    (project_dir / ".env").write_text(
+        "\n".join(
+            [
+                "QL_URL=http://sf-ql:5700/",
+                "QL_CLIENT_ID=sf_client_id",
+                "QL_CLIENT_SECRET=sf_client_secret",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("SF_PROJECT_DIR", str(project_dir))
+
+    api = sf._get_sf_ql()
+
+    assert api.base_url == "http://sf-ql:5700"
+    assert api.client_id == "sf_client_id"
+    assert api.client_secret == "sf_client_secret"
+
+
+def test_sf_script_path_prefers_explicit_path(monkeypatch):
+    monkeypatch.setenv("SF_PROJECT_DIR", "/opt/QL-SF")
+    monkeypatch.setenv("SFSY_SCRIPT_PATH", "/custom/sfsy.py")
+
+    assert sf._get_sf_script_path() == "/custom/sfsy.py"
+
+
+def test_build_sfsy_env_injects_cookie_from_qinglong(monkeypatch):
+    monkeypatch.setattr(
+        "bot.plugins.sf._get_env",
+        lambda name: {"name": name, "value": "sessionId=s1;_login_user_id_=u1;_login_mobile_=13856914746"},
+    )
+
+    env = sf._build_sfsy_env()
+
+    assert env[SF_COOKIE_ENV] == "sessionId=s1;_login_user_id_=u1;_login_mobile_=13856914746"

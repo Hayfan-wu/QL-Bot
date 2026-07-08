@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 from bot.plugins.base import Plugin
-from bot.ql_api import ql
+from bot.ql_api import QingLongAPI, ql
 from bot.session import sessions
 from bot.sf_api import SFLoginStatus, SFWechatLoginAPI
 
@@ -21,14 +21,82 @@ from bot.sf_api import SFLoginStatus, SFWechatLoginAPI
 SF_COOKIE_ENV = "sfsyUrl"
 SF_WECHAT_ENV = "SF_WECHAT_LOGIN"
 SF_LOGIN_TIMEOUT = 180
+SF_SCRIPT_ENV_NAMES = [
+    SF_COOKIE_ENV,
+    "SFBF",
+    "SF_PROXY_API_URL",
+    "SF_KEEPALIVE",
+    "WXPUSHER_APP_TOKEN",
+    "WXPUSHER_UIDS",
+    "WXPUSHER_TOPIC_IDS",
+    "WXPUSHER_ONLY_EXPIRED",
+]
 
 
 def _now_ts():
     return datetime.now().timestamp()
 
 
+def _parse_env_file(env_path):
+    """读取简单 KEY=VALUE 格式的 .env 文件"""
+    values = {}
+    if not env_path or not os.path.exists(env_path):
+        return values
+
+    with open(env_path, "r", encoding="utf-8") as file:
+        for line in file:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
+
+
+def _get_sf_script_path():
+    """获取顺丰脚本路径"""
+    project_dir = os.getenv("SF_PROJECT_DIR", "").strip()
+    if os.getenv("SFSY_SCRIPT_PATH"):
+        return os.getenv("SFSY_SCRIPT_PATH")
+    if project_dir:
+        return os.path.join(project_dir, "sfsy.py")
+    return "sfsy.py"
+
+
+def _get_sf_project_dir():
+    """获取 QL-SF 项目目录"""
+    project_dir = os.getenv("SF_PROJECT_DIR", "").strip()
+    if project_dir:
+        return project_dir
+
+    script_path = _get_sf_script_path()
+    script_dir = os.path.dirname(os.path.expanduser(script_path))
+    return script_dir or ""
+
+
+def _get_sf_ql():
+    """从 QL-SF 项目 .env 创建青龙客户端；缺省时兼容旧全局配置"""
+    project_dir = _get_sf_project_dir()
+    env_path = os.path.join(project_dir, ".env") if project_dir else ""
+    env_values = _parse_env_file(env_path)
+
+    ql_url = env_values.get("QL_URL")
+    client_id = env_values.get("QL_CLIENT_ID")
+    client_secret = env_values.get("QL_CLIENT_SECRET")
+
+    if ql_url and client_id and client_secret:
+        return QingLongAPI(
+            base_url=ql_url,
+            client_id=client_id,
+            client_secret=client_secret,
+        )
+
+    return ql
+
+
 def _get_env(name):
-    envs = ql.list_envs(name)
+    sf_ql = _get_sf_ql()
+    envs = sf_ql.list_envs(name)
     for env in envs:
         if env.get("name") == name:
             return env
@@ -41,15 +109,16 @@ def _env_id(env):
 
 def _save_env(name, value, remarks=""):
     existing = _get_env(name)
+    sf_ql = _get_sf_ql()
     if existing:
-        return ql.update_env(_env_id(existing), name, value, remarks=remarks)
-    return ql.create_env(name, value, remarks=remarks)
+        return sf_ql.update_env(_env_id(existing), name, value, remarks=remarks)
+    return sf_ql.create_env(name, value, remarks=remarks)
 
 
 def _delete_env(name):
     existing = _get_env(name)
     if existing:
-        ql.delete_env(_env_id(existing))
+        _get_sf_ql().delete_env(_env_id(existing))
         return True
     return False
 
@@ -93,8 +162,20 @@ def _format_image_cq(path):
     return f"[CQ:image,file={uri}]"
 
 
+def _build_sfsy_env():
+    """构造顺丰脚本执行环境，把青龙变量注入本地进程"""
+    env = os.environ.copy()
+
+    for name in SF_SCRIPT_ENV_NAMES:
+        item = _get_env(name)
+        if item and item.get("value"):
+            env[name] = item.get("value")
+
+    return env
+
+
 def _run_sfsy():
-    script_path = os.getenv("SFSY_SCRIPT_PATH", "sfsy.py")
+    script_path = _get_sf_script_path()
     script_path = os.path.expanduser(script_path)
     base_dir = os.path.dirname(script_path) if os.path.dirname(script_path) else os.getcwd()
     script_name = os.path.basename(script_path)
@@ -105,6 +186,7 @@ def _run_sfsy():
             text=True,
             timeout=300,
             cwd=base_dir,
+            env=_build_sfsy_env(),
         )
         output = result.stdout + result.stderr
         if len(output) > 1500:
