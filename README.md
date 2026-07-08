@@ -77,6 +77,34 @@ python3 main.py
 | `@机器人 WPS管理 登出` | 删除 `WPS_COOKIE` |
 | `@机器人 帮助` | 显示命令列表 |
 
+## 顺丰扫码登录
+
+顺丰插件支持微信扫码识别顺丰会员态，但当前不会自动生成积分任务 Cookie。
+
+### 顺丰命令
+
+| 命令 | 说明 |
+| --- | --- |
+| `@机器人 顺丰登录` | 生成微信 OAuth 二维码，扫码后发送 `顺丰状态` 查询结果 |
+| `@机器人 顺丰状态` | 轮询扫码状态，状态包括未扫码、已扫码、取消、已登录 |
+| `@机器人 顺丰Cookie <sfsyUrl>` | 手动保存积分任务 Cookie |
+| `@机器人 顺丰查询` | 查看 `sfsyUrl` 和 `SF_WECHAT_LOGIN` 保存状态 |
+| `@机器人 顺丰执行` | 立即执行 `SFSY_SCRIPT_PATH` 指向的脚本 |
+| `@机器人 顺丰管理 登出` | 删除顺丰相关青龙变量 |
+
+### 顺丰环境变量
+
+| 变量 | 说明 |
+| --- | --- |
+| `SF_WECHAT_LOGIN` | 微信扫码后保存的顺丰会员态，包含 `OWFSESSION`、`memid`、`memNo`、`mobile` |
+| `sfsyUrl` | 顺丰积分任务 Cookie，格式为 `sessionId=xxx;_login_user_id_=xxx;_login_mobile_=xxx` |
+| `SFSY_SCRIPT_PATH` | 顺丰业务脚本路径，例如 `/opt/QL-SF/sfsy.py` |
+| `SF_QR_OUTPUT_DIR` | 顺丰二维码图片输出目录，默认当前工作目录 |
+
+### 当前限制
+
+微信扫码登录已验证可以拿到顺丰会员态，但该会员态不能直接换成 `mcs-mimp-web` 积分任务 Cookie。若后续找到无短信换票接口，可在 `bot/sf_api.py` 中新增换票方法，再由插件自动写入 `sfsyUrl`。
+
 ## 新增控制插件（适配新业务脚本）
 
 参考 `bot/plugins/example.py`，只需三步：
