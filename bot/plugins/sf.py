@@ -13,9 +13,13 @@ from datetime import datetime
 from pathlib import Path
 
 from bot.plugins.base import Plugin
-from bot.ql_api import QingLongAPI, ql
+from bot.ql_api import QingLongAPI
 from bot.session import sessions
 from bot.sf_api import SFLoginStatus, SFWechatLoginAPI
+
+
+class SFConfigError(Exception):
+    """顺丰项目配置错误"""
 
 
 SF_COOKIE_ENV = "sfsyUrl"
@@ -94,21 +98,33 @@ def _get_sf_qr_output_dir():
 
 
 def _get_sf_ql():
-    """从 QL-SF 项目 .env 创建青龙客户端；缺省时兼容旧全局配置"""
+    """从 QL-SF 项目 .env 创建青龙客户端"""
     env_values = _get_sf_project_env()
 
     ql_url = env_values.get("QL_URL")
     client_id = env_values.get("QL_CLIENT_ID")
     client_secret = env_values.get("QL_CLIENT_SECRET")
 
-    if ql_url and client_id and client_secret:
-        return QingLongAPI(
-            base_url=ql_url,
-            client_id=client_id,
-            client_secret=client_secret,
+    missing = [
+        name for name, value in {
+            "QL_URL": ql_url,
+            "QL_CLIENT_ID": client_id,
+            "QL_CLIENT_SECRET": client_secret,
+        }.items()
+        if not value
+    ]
+    if missing:
+        env_path = os.path.join(_get_sf_project_dir(), ".env")
+        raise SFConfigError(
+            "顺丰配置不完整，请检查 "
+            f"{env_path}，缺少：{', '.join(missing)}"
         )
 
-    return ql
+    return QingLongAPI(
+        base_url=ql_url,
+        client_id=client_id,
+        client_secret=client_secret,
+    )
 
 
 def _get_env(name):
@@ -230,21 +246,26 @@ class SfPlugin(Plugin):
         self.api_by_key = {}
 
     def handle(self, text, sender_id, group_id=None):
-        text = text.strip()
-        if re.match(r"^顺丰\s*登录", text, re.IGNORECASE):
-            return self._handle_login(sender_id, group_id)
-        if re.match(r"^顺丰\s*状态", text, re.IGNORECASE):
-            return self._handle_status(sender_id, group_id)
-        if re.match(r"^顺丰\s*Cookie", text, re.IGNORECASE):
-            cookie = re.sub(r"^顺丰\s*Cookie\s*", "", text, flags=re.IGNORECASE).strip()
-            return self._handle_cookie(cookie)
-        if re.match(r"^顺丰\s*查询", text, re.IGNORECASE):
-            return self._handle_query()
-        if re.match(r"^顺丰\s*执行", text, re.IGNORECASE):
-            return _run_sfsy()
-        if re.match(r"^顺丰\s*管理", text, re.IGNORECASE):
-            return self._handle_manage(text)
-        return "未知命令，发送「顺丰登录」开始扫码。"
+        try:
+            text = text.strip()
+            if re.match(r"^顺丰\s*登录", text, re.IGNORECASE):
+                return self._handle_login(sender_id, group_id)
+            if re.match(r"^顺丰\s*状态", text, re.IGNORECASE):
+                return self._handle_status(sender_id, group_id)
+            if re.match(r"^顺丰\s*Cookie", text, re.IGNORECASE):
+                cookie = re.sub(r"^顺丰\s*Cookie\s*", "", text, flags=re.IGNORECASE).strip()
+                return self._handle_cookie(cookie)
+            if re.match(r"^顺丰\s*查询", text, re.IGNORECASE):
+                return self._handle_query()
+            if re.match(r"^顺丰\s*执行", text, re.IGNORECASE):
+                return _run_sfsy()
+            if re.match(r"^顺丰\s*管理", text, re.IGNORECASE):
+                return self._handle_manage(text)
+            return "未知命令，发送「顺丰登录」开始扫码。"
+        except SFConfigError as exc:
+            return f"❌ {exc}"
+        except Exception as exc:
+            return f"❌ 顺丰处理失败：{exc}"
 
     def _session_key(self, sender_id, group_id):
         return f"{group_id or 'private'}:{sender_id}"

@@ -108,6 +108,29 @@ def test_sf_uses_default_project_env_without_bot_env(tmp_path, monkeypatch):
     assert api.client_secret == "default_sf_client_secret"
 
 
+def test_sf_query_returns_config_hint_when_project_env_missing_credentials(tmp_path, monkeypatch):
+    project_dir = tmp_path / "QL-SF"
+    project_dir.mkdir()
+    (project_dir / ".env").write_text(
+        "\n".join(
+            [
+                "QL_URL=http://sf-ql:5700/",
+                "SFSY_SCRIPT_PATH=/opt/QL-SF/sfsy.py",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(sf, "DEFAULT_SF_PROJECT_DIR", str(project_dir), raising=False)
+
+    reply = sf.SfPlugin().handle("顺丰查询", sender_id=10001, group_id=20002)
+
+    assert "顺丰配置不完整" in reply
+    assert "QL_CLIENT_ID" in reply
+    assert "QL_CLIENT_SECRET" in reply
+    assert str(project_dir / ".env") in reply
+
+
 def test_sf_script_path_reads_project_env(tmp_path, monkeypatch):
     project_dir = tmp_path / "QL-SF"
     project_dir.mkdir()
