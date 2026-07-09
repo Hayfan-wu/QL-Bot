@@ -1,3 +1,1 @@
-from .sf import SfPlugin
-
-__all__ = ["SfPlugin"]
+__all__ = []
