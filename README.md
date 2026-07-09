@@ -2,32 +2,40 @@
 
 基于 NapCatQQ 反向 WebSocket 的通用 QQ 机器人插件化框架。
 
-本仓库只负责 QQ 群交互与控制调度，具体的业务脚本（如 WPS 自动签到）放在各自的业务仓库中。新增业务只需写一个控制插件放到 `bot/plugins/`，再配置对应的脚本路径即可。
+本仓库只负责 QQ 群交互与控制调度，不管理任何业务脚本。业务项目把 QQ 控制插件放在自己的仓库中，QL-Bot 启动时自动扫描加载，**无需修改 QL-Bot 的 `.env` 即可新增业务项目**。
 
 ## 设计思路
 
 ```
-QL-Bot/           <- 本仓库：QQ 机器人框架 + 控制插件
+QL-Bot/           <- 本仓库：QQ 机器人框架
 ├── main.py
 ├── bot/
 │   ├── core.py
+│   ├── project_loader.py   <- 自动扫描业务项目插件
 │   ├── plugins/
-│   │   ├── wps.py      <- WPS 控制插件
-│   │   └── example.py  <- 新插件模板
+│   │   └── example.py      <- 内置示例插件
 │   └── ...
-└── .env          <- 只放机器人配置、业务项目路径
+└── .env                     <- 只放机器人核心配置
 
-QL-WPS/           <- 业务仓库：具体自动化脚本
-├── .env          <- WPS 自己的青龙配置
-└── wps_auto.py
-
-QL-SF/            <- 业务仓库：顺丰脚本
-├── .env          <- 顺丰自己的青龙配置
-└── sfsy.py
-
-QL-JD/            <- 未来新业务仓库（示例）
-└── jd_auto.py
+/opt
+├── QL-WPS/       <- 业务仓库：WPS 自动脚本
+│   ├── wps_auto.py
+│   ├── .env
+│   └── bot_plugins/
+│       └── wps.py          <- WPS 的 QQ 控制插件
+│
+├── QL-SF/        <- 业务仓库：顺丰脚本（示例）
+│   ├── sfsy.py
+│   ├── .env
+│   └── bot_plugins/
+│       └── sf.py
 ```
+
+## 核心原则
+
+- **QL-Bot `.env` 不存储任何业务项目配置**
+- 业务项目的青龙地址、脚本路径、Token 等全部放在各自仓库的 `.env`
+- 新增业务项目只需 `git clone` 到 `/opt` 下，重启 QL-Bot 即可自动加载
 
 ## 快速开始
 
@@ -47,41 +55,16 @@ cp .env.example .env
 nano .env
 ```
 
-关键配置：
-
 ```bash
-# QQ 机器人
+# 机器人核心配置（只填这些）
 QQ_BOT_QQ=你的机器人QQ号
 NAPCAT_API=http://127.0.0.1:3000
 ADMIN_QQ=你的QQ号
-
-# WPS 项目路径（指向 QL-WPS 仓库）
-WPS_PROJECT_DIR=/opt/QL-WPS
-WPS_SCRIPT_PATH=/opt/QL-WPS/wps_auto.py
-
+WS_HOST=0.0.0.0
+WS_PORT=8080
+WS_PATH=/onebot/v11/ws/
+PROJECT_SCAN_DIRS=/opt
 ```
-
-WPS 使用的青龙面板配置请放到 `/opt/QL-WPS/.env`：
-
-```bash
-QL_URL=http://127.0.0.1:5700
-QL_CLIENT_ID=你的WPS项目青龙ClientID
-QL_CLIENT_SECRET=你的WPS项目青龙ClientSecret
-```
-
-`WPS_COOKIE` 不需要手动写入 `.env`。发送 `@机器人 WPS登录` 后粘贴 Cookie，机器人会自动把 `WPS_COOKIE` 写入 `QL-WPS/.env` 指定的青龙面板。
-
-顺丰配置请放到 `/opt/QL-SF/.env`：
-
-```bash
-QL_URL=http://127.0.0.1:5700
-QL_CLIENT_ID=你的顺丰项目青龙ClientID
-QL_CLIENT_SECRET=你的顺丰项目青龙ClientSecret
-SFSY_SCRIPT_PATH=/opt/QL-SF/sfsy.py
-SF_QR_OUTPUT_DIR=/opt/QL-Bot
-```
-
-`sfsyUrl` 不需要手动写入 `.env`。发送 `@机器人 顺丰Cookie sessionId=...;_login_user_id_=...;_login_mobile_=...` 后，机器人会自动把 `sfsyUrl` 写入 `QL-SF/.env` 指定的青龙面板；发送 `@机器人 顺丰执行` 时，会从青龙读取 `sfsyUrl` 并注入到 `/opt/QL-SF/sfsy.py` 的执行环境。
 
 ### 3. 启动
 
@@ -89,65 +72,97 @@ SF_QR_OUTPUT_DIR=/opt/QL-Bot
 python3 main.py
 ```
 
-## WPS 控制插件命令
+启动后会自动扫描 `/opt` 下所有项目的 `bot_plugins/` 目录并加载插件。
+
+## WPS 控制插件（业务项目自带）
+
+插件文件：`/opt/QL-WPS/bot_plugins/wps.py`
 
 | 命令 | 说明 |
 | --- | --- |
 | `@机器人 WPS登录` | 45 秒内粘贴 Cookie，自动验证并写入青龙 `WPS_COOKIE` |
 | `@机器人 WPS登录 <cookie>` | 一键登录 |
 | `@机器人 WPS查询` | 查询 WPS 账号状态、签到、任务、抽奖 |
-| `@机器人 WPS执行` | 立即执行 `WPS_SCRIPT_PATH` 指向的脚本 |
+| `@机器人 WPS执行` | 立即执行 `wps_auto.py` |
 | `@机器人 WPS管理` | 查看当前 `WPS_COOKIE` |
 | `@机器人 WPS管理 登出` | 删除 `WPS_COOKIE` |
 | `@机器人 帮助` | 显示命令列表 |
 
-## 顺丰扫码登录
+## 新增业务项目（无需改 QL-Bot）
 
-顺丰插件支持微信扫码识别顺丰会员态，但当前不会自动生成积分任务 Cookie。
+假设要新增一个「京东」项目：
 
-### 顺丰命令
+### 1. 创建业务仓库 `QL-JD`
 
-| 命令 | 说明 |
-| --- | --- |
-| `@机器人 顺丰登录` | 生成微信 OAuth 二维码，扫码后发送 `顺丰状态` 查询结果 |
-| `@机器人 顺丰状态` | 轮询扫码状态，状态包括未扫码、已扫码、取消、已登录 |
-| `@机器人 顺丰Cookie <sfsyUrl>` | 手动保存积分任务 Cookie |
-| `@机器人 顺丰查询` | 查看 `sfsyUrl` 和 `SF_WECHAT_LOGIN` 保存状态 |
-| `@机器人 顺丰执行` | 立即执行 `SFSY_SCRIPT_PATH` 指向的脚本 |
-| `@机器人 顺丰管理 登出` | 删除顺丰相关青龙变量 |
+```
+QL-JD/
+├── jd_auto.py
+├── .env
+└── bot_plugins/
+    └── jd.py
+```
 
-### 顺丰环境变量
+### 2. `QL-JD/.env` 放项目自己的配置
 
-| 变量 | 说明 |
-| --- | --- |
-| `SF_WECHAT_LOGIN` | 微信扫码后保存的顺丰会员态，包含 `OWFSESSION`、`memid`、`memNo`、`mobile` |
-| `sfsyUrl` | 顺丰积分任务 Cookie，格式为 `sessionId=xxx;_login_user_id_=xxx;_login_mobile_=xxx` |
-| `SFSY_SCRIPT_PATH` | 顺丰业务脚本路径，配置在 `/opt/QL-SF/.env` |
-| `SF_QR_OUTPUT_DIR` | 顺丰二维码图片输出目录，配置在 `/opt/QL-SF/.env` |
+```bash
+QL_URL=http://127.0.0.1:5700
+QL_CLIENT_ID=你的client_id
+QL_CLIENT_SECRET=你的client_secret
+```
 
-### 当前限制
-
-微信扫码登录已验证可以拿到顺丰会员态，但该会员态不能直接换成 `mcs-mimp-web` 积分任务 Cookie。若后续找到无短信换票接口，可在 `bot/sf_api.py` 中新增换票方法，再由插件自动写入 `sfsyUrl`。
-
-## 新增控制插件（适配新业务脚本）
-
-参考 `bot/plugins/example.py`，只需三步：
-
-1. 在 `bot/plugins/` 下新建 `xxx.py`
-2. 继承 `Plugin` 基类，实现 `name` 和 `commands`
-3. 在 `.env` 中新增该业务脚本路径（可选）
+### 3. `QL-JD/bot_plugins/jd.py` 写控制插件
 
 ```python
-# bot/plugins/jd.py
-from bot.plugins.base import Plugin
+# -*- coding: utf-8 -*-
 import re
+from bot.plugins.base import Plugin
+from bot.project_env import ProjectEnv
 
 class JdPlugin(Plugin):
     name = 'jd'
     commands = [re.compile(r'^JD\s*登录', re.IGNORECASE)]
 
     def handle(self, text, sender_id, group_id=None):
-        return '京东插件示例'
+        env = ProjectEnv(self.project_dir)
+        return f'京东插件已加载，项目目录：{self.project_dir}'
+```
+
+### 4. 部署到服务器
+
+```bash
+cd /opt
+git clone https://github.com/你的账号/QL-JD.git
+```
+
+### 5. 重启 QL-Bot
+
+```bash
+cd /opt/QL-Bot
+git pull   # 框架本身无需改动
+pkill -f "python3 main.py"
+export $(cat .env | grep -v '^#' | xargs)
+nohup python3 main.py > main.log 2>&1 &
+```
+
+无需修改 QL-Bot 的 `.env` 或任何代码。
+
+## 业务项目插件开发规范
+
+1. 插件文件必须放在业务项目根目录的 `bot_plugins/` 下
+2. 插件类必须继承 `bot.plugins.base.Plugin`
+3. 必须设置 `name` 和 `commands`
+4. 必须实现 `handle(text, sender_id, group_id)` 方法
+5. 需要读取项目 `.env` 时，使用 `bot.project_env.ProjectEnv`
+6. 如果需要处理多步会话（如登录），提供 `register_session_handlers(handlers)` 函数
+
+### 会话处理器示例
+
+```python
+def register_session_handlers(handlers):
+    handlers['your_plugin_name'] = your_session_handler
+
+def your_session_handler(text, sender_id, group_id, session_data):
+    return '收到会话输入'
 ```
 
 ## 文件说明
@@ -156,54 +171,21 @@ class JdPlugin(Plugin):
 QL-Bot/
 ├── main.py                 # 启动入口
 ├── bot/
-│   ├── config.py           # 配置管理
+│   ├── config.py           # 机器人核心配置
 │   ├── core.py             # WS 服务、插件加载、消息分发
+│   ├── project_loader.py   # 业务项目插件扫描加载器
+│   ├── project_env.py      # 项目级 .env 读取工具
 │   ├── utils.py            # 日志、消息发送
 │   ├── ql_api.py           # 青龙 Open API 封装
-│   ├── wps_api.py          # WPS 信息查询/验证
 │   ├── session.py          # 用户会话管理
 │   └── plugins/
 │       ├── base.py         # 插件基类
-│       ├── wps.py          # WPS 控制插件
-│       └── example.py      # 新插件模板
-├── .env.example            # 环境变量模板
+│       └── example.py      # 内置示例插件
+├── .env.example            # 机器人核心配置模板
 ├── wps-bot.service         # systemd 服务模板
 ├── requirements.txt
 └── README.md
 ```
-
-## 与业务仓库配合
-
-以 QL-WPS 为例：
-
-```bash
-cd /opt
-git clone https://github.com/Hayfan-wu/QL-WPS.git
-git clone https://github.com/Hayfan-wu/QL-SF.git
-git clone https://github.com/Hayfan-wu/QL-Bot.git
-
-# QL-Bot 的 .env 中配置
-WPS_PROJECT_DIR=/opt/QL-WPS
-WPS_SCRIPT_PATH=/opt/QL-WPS/wps_auto.py
-
-# QL-WPS 的 .env 中配置
-QL_URL=http://127.0.0.1:5700
-QL_CLIENT_ID=你的WPS项目青龙ClientID
-QL_CLIENT_SECRET=你的WPS项目青龙ClientSecret
-
-# QL-SF 的 .env 中配置
-QL_URL=http://127.0.0.1:5700
-QL_CLIENT_ID=你的顺丰项目青龙ClientID
-QL_CLIENT_SECRET=你的顺丰项目青龙ClientSecret
-SFSY_SCRIPT_PATH=/opt/QL-SF/sfsy.py
-SF_QR_OUTPUT_DIR=/opt/QL-Bot
-
-# 启动 QQ 机器人
-cd /opt/QL-Bot
-python3 main.py
-```
-
-以后更新业务脚本只需在对应仓库执行 `git pull`，控制框架无需改动。
 
 ## 重启命令
 
