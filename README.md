@@ -74,19 +74,6 @@ python3 main.py
 
 启动后会自动扫描 `/opt` 下所有项目的 `bot_plugins/` 目录并加载插件。
 
-## WPS 控制插件（业务项目自带）
-
-插件文件：`/opt/QL-WPS/bot_plugins/wps.py`
-
-| 命令 | 说明 |
-| --- | --- |
-| `@机器人 WPS登录` | 45 秒内粘贴 Cookie，自动验证并写入青龙 `WPS_COOKIE` |
-| `@机器人 WPS登录 <cookie>` | 一键登录 |
-| `@机器人 WPS查询` | 查询 WPS 账号状态、签到、任务、抽奖 |
-| `@机器人 WPS执行` | 立即执行 `wps_auto.py` |
-| `@机器人 WPS管理` | 查看当前 `WPS_COOKIE` |
-| `@机器人 WPS管理 登出` | 删除 `WPS_COOKIE` |
-| `@机器人 帮助` | 显示命令列表 |
 
 ## 新增业务项目（无需改 QL-Bot）
 
